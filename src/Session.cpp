@@ -312,7 +312,7 @@ size_t handle_http(void *contents, size_t size, size_t nmemb, void *userp) {
     // Offset into buffer to write to
     size_t off = http_response.size();
 
-    http_response.resize(nmemb * size);
+    http_response.resize(nmemb * size + off);
 
     memcpy(http_response.data() + off, contents, nmemb * size);
 
