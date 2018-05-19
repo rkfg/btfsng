@@ -37,7 +37,7 @@ private:
     std::mutex& m_mutex;
     std::condition_variable& m_cv;
 
-    void prioritize(int piece);
+    void prioritize(int piece, int priority);
 };
 
 #endif /* READTASK_H_ */

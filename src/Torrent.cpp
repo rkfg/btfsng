@@ -9,6 +9,7 @@
 #include <curl/curl.h>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/magnet_uri.hpp>
+#include "../easyloggingpp/src/easylogging++.h"
 
 Torrent::Torrent(std::recursive_mutex& global_mutex, btfs_params& params, libtorrent::torrent_handle& handle) :
         m_global_mutex(global_mutex), m_params(params), m_handle(handle) {
@@ -17,14 +18,6 @@ Torrent::Torrent(std::recursive_mutex& global_mutex, btfs_params& params, libtor
 
 const libtorrent::torrent_handle& Torrent::handle() {
     return m_handle;
-}
-
-Torrent::~Torrent() {
-    if (!m_params.keep) {
-        if (rmdir(m_handle.status().save_path.c_str()))
-            perror("Failed to remove files directory");
-
-    }
 }
 
 bool Torrent::is_root(const char *path) {
@@ -132,7 +125,7 @@ int Torrent::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 }
 
 void Torrent::setup() {
-    printf("Got metadata. Now ready to start downloading.\n");
+    VLOG(1) << "Got metadata. Now ready to start downloading.";
 
     auto ti = m_handle.torrent_file();
 
@@ -178,9 +171,9 @@ void Torrent::setup() {
 
 void Torrent::read_piece(const libtorrent::read_piece_alert& a) {
     std::lock_guard<std::mutex> l(m_read_mutex);
-    std::cout << "Torrent::read_piece " << a.piece << std::endl;
+    VLOG(3) << "Read piece " << a.piece;
     if (a.ec) {
-        std::cout << a.message() << std::endl;
+        LOG(WARNING) << a.message();
 
         for (auto& r : m_reads) {
             r->fail(a.piece);

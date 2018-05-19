@@ -32,10 +32,11 @@ To unmount and shutdown:
 * fuse ("fuse" in Ubuntu 16.04)
 * libtorrent ("libtorrent-rasterbar8" in Ubuntu 16.04)
 * libcurl ("libcurl3" in Ubuntu 16.04)
+* boost-system, boost-filesystem ("libboost-filesystem" and "libboost-system-dev" in Ubuntu 16.04)
 
 ## Building from git on a recent Debian/Ubuntu
 
-    $ sudo apt-get install autoconf automake libfuse-dev libtorrent-rasterbar-dev libcurl4-openssl-dev g++ meson
+    $ sudo apt-get install autoconf automake libfuse-dev libtorrent-rasterbar-dev libcurl4-openssl-dev libboost-filesystem-dev g++ meson
     $ git clone https://github.com/rkfg/btfsng.git btfsng
     $ cd btfsng
     $ meson build
@@ -50,7 +51,7 @@ And optionally, if you want to install it:
 
 Use [`brew`](https://brew.sh) to get the dependencies.
 
-    $ brew install Caskroom/cask/osxfuse libtorrent-rasterbar autoconf automake pkg-config meson
+    $ brew install Caskroom/cask/osxfuse libtorrent-rasterbar libboost-filesystem-dev autoconf automake pkg-config meson
     $ git clone https://github.com/rkfg/btfsng.git btfsng
     $ cd btfsng
     $ meson build

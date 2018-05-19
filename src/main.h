@@ -14,6 +14,7 @@
 
 struct btfs_params {
     int version;
+    int verbose;
     int help;
     int help_fuse;
     int browse_only;

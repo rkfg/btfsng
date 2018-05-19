@@ -25,12 +25,12 @@
 #include "main.h"
 #include "Session.h"
 #include "Torrent.h"
+#include "../easyloggingpp/src/easylogging++.h"
+INITIALIZE_EASYLOGGINGPP
 
 using namespace std;
 
 std::list<std::string> metadatas;
-
-#define RETV(s, v) { s; return v; };
 
 static struct btfs_params params;
 static Session sess(params);
@@ -38,7 +38,8 @@ static Session sess(params);
 #define BTFS_OPT(t, p, v) { t, offsetof(struct btfs_params, p), v }
 
 static const struct fuse_opt btfs_opts[] = {
-BTFS_OPT("-v", version, 1),
+FUSE_OPT_KEY("-v", FUSE_OPT_KEY_DISCARD),
+FUSE_OPT_KEY("--v=", FUSE_OPT_KEY_DISCARD),
 BTFS_OPT("--version", version, 1),
 BTFS_OPT( "-h", help, 1),
 BTFS_OPT("--help", help, 1),
@@ -69,7 +70,7 @@ static void print_help() {
     printf("usage: btfsng [options] metadata mountpoint\n");
     printf("\n");
     printf("btfs options:\n");
-    printf("    --version -v           show version information\n");
+    printf("    --version              show version information\n");
     printf("    --help -h              show this message\n");
     printf("    --help-fuse            print all fuse options\n");
     printf("    --browse-only -b       download metadata only\n");
@@ -100,27 +101,37 @@ static void btfs_destroy(void *user_data) {
     sess.stop();
 }
 
-int main(int argc, char *argv[]) {
+void initLog() {
+    el::Configurations defaultConf;
+    defaultConf.setToDefault();
+    defaultConf.setGlobally(el::ConfigurationType::Format, "%datetime %level %msg");
+    defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
+    defaultConf.set(el::Level::Debug, el::ConfigurationType::Format, "%datetime %fbase:%line %level %msg");
+    defaultConf.set(el::Level::Verbose, el::ConfigurationType::Format, "%datetime [%func] %fbase:%line %level %msg");
+    el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
+    el::Loggers::reconfigureAllLoggers(defaultConf);
+}
 
+int main(int argc, char *argv[]) {
+    START_EASYLOGGINGPP(argc, argv);
+    initLog();
     struct fuse_operations btfs_ops;
     memset(&btfs_ops, 0, sizeof(btfs_ops));
     btfs_ops.getattr = btfs_getattr;
     btfs_ops.readdir = btfs_readdir;
     btfs_ops.open = btfs_open;
     btfs_ops.read = btfs_read;
-    /*
-     btfs_ops.statfs = btfs_statfs;
-     btfs_ops.listxattr = btfs_listxattr;
-     btfs_ops.getxattr = btfs_getxattr;
-     */
     btfs_ops.destroy = btfs_destroy;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
-    if (fuse_opt_parse(&args, &params, btfs_opts, btfs_process_arg))
-        RETV(fprintf(stderr, "Failed to parse options\n"), -1);
+    if (fuse_opt_parse(&args, &params, btfs_opts, btfs_process_arg)) {
+        LOG(FATAL)<< "Failed to parse options";
+        return 1;
+    }
 
-    if (metadatas.empty())
+    if (metadatas.empty()) {
         params.help = 1;
+    }
 
     if (params.version) {
         printf("btfsng version: 0.1\n");
@@ -158,8 +169,10 @@ int main(int argc, char *argv[]) {
         params.max_port = 65535;
     }
 
-    if (params.min_port > params.max_port)
-        RETV(fprintf(stderr, "Invalid port range\n"), -1);
+    if (params.min_port > params.max_port) {
+        LOG(FATAL)<< "Invalid port range";
+        return 1;
+    }
 
     sess.init();
 

@@ -9,7 +9,9 @@
 #include <libtorrent/alert_types.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/torrent_info.hpp>
+#include <boost/filesystem.hpp>
 #include <curl/curl.h>
+#include "../easyloggingpp/src/easylogging++.h"
 #define STRINGIFY(s) #s
 
 Session::Session(btfs_params& params) :
@@ -30,7 +32,20 @@ void Session::stop() {
     for (auto& t : m_thmap) {
         m_session->remove_torrent(t.second->handle(), flags);
     }
-    m_alert_thread->join();
+    try {
+        if (m_alert_thread->joinable()) { // race condition is possible here, will be caught
+            m_alert_thread->join();
+        }
+    } catch (const std::exception& e) {
+        LOG(WARNING) << "Couldn't join alert thread " << e.what();
+    }
+    if (!m_params.keep) {
+        for (auto& t : m_thmap) {
+            namespace fs = boost::filesystem;
+            fs::path save_path(t.first.status().save_path);
+            fs::remove_all(save_path.parent_path());
+        }
+    }
 }
 
 void Session::init() {
@@ -84,10 +99,10 @@ void Session::init() {
 
     std::ostringstream interfaces;
 
-    // First port
+// First port
     interfaces << "0.0.0.0:" << m_params.min_port;
 
-    // Possibly more ports, but at most 5
+// Possibly more ports, but at most 5
     for (int i = m_params.min_port + 1; i <= m_params.max_port && i < m_params.min_port + 5; i++)
     interfaces << ",0.0.0.0:" << i;
 
@@ -166,23 +181,26 @@ Torrent& Session::getTorrentByPath(const char* path) {
 
 void Session::handle_torrent_added_alert(libtorrent::torrent_added_alert *a, Torrent& t) {
     LOCK;
+    VLOG(1) << "Torrent '" << a->handle.status().name << "' added";
     if (a->handle.status().has_metadata)
     t.setup();
 }
 
 void Session::handle_metadata_received_alert(libtorrent::metadata_received_alert *a, Torrent& t) {
     LOCK;
+    VLOG(1) << "Metadata for '" << a->handle.status().name << "' received";
     t.setup();
 }
 
 void Session::handle_read_piece_alert(libtorrent::read_piece_alert *a, Torrent& t) {
     LOCK;
+    VLOG(2) << "Piece " << a->piece <<" read";
     t.read_piece(*a);
 }
 
 void Session::handle_piece_finished_alert(libtorrent::piece_finished_alert *a, Torrent& t) {
     LOCK;
-    std::cout << "Piece finished " << a->piece_index << std::endl;
+    VLOG(2) << "Piece " << a->piece_index << " finished downloading";
     t.try_read_all(a->piece_index);
 }
 void Session::handle_alert(libtorrent::alert *a) {
@@ -235,6 +253,7 @@ void Session::handle_alert(libtorrent::alert *a) {
 libtorrent::add_torrent_params Session::create_torrent_params(const std::string& metadata) {
     libtorrent::add_torrent_params add_params;
     std::string target = populate_target();
+    VLOG(1) << "Files path: " << target;
 
 #if LIBTORRENT_VERSION_NUM < 10200
     add_params.flags &= ~libtorrent::add_torrent_params::flag_auto_managed;
@@ -377,4 +396,8 @@ void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_
 #endif
     }
 
+}
+
+Session::~Session() {
+    stop();
 }

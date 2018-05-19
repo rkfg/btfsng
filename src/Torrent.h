@@ -30,7 +30,6 @@ public:
     int readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
     void read_piece(const libtorrent::read_piece_alert& a);
     void try_read_all(int piece);
-    ~Torrent();
 private:
     time_t m_time_of_mount;
     std::recursive_mutex& m_global_mutex;

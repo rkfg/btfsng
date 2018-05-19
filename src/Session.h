@@ -24,6 +24,7 @@ public:
     void stop();
     Torrent& addTorrent(const std::string& metadata);
     Torrent& getTorrentByPath(const char* path);
+    ~Session();
 private:
     std::recursive_mutex m_global_mutex;
     btfs_params& m_params;
