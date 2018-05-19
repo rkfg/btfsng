@@ -79,6 +79,19 @@ static void print_help() {
     printf("    --max-port=N           end of listen port range\n");
     printf("    --max-download-rate=N  max download rate (in kB/s)\n");
     printf("    --max-upload-rate=N    max upload rate (in kB/s)\n");
+    printf("    -v, --v=N              verbose logging (1-3)\n");
+}
+static void* btfs_init(struct fuse_conn_info *conn) {
+    try {
+        sess.init();
+        for (auto& metadata : metadatas) {
+            sess.addTorrent(metadata);
+        }
+    } catch (const std::exception& e) {
+        LOG(FATAL)<< "Error initializing session: " << e.what();
+        fuse_exit(fuse_get_context()->fuse);
+    }
+    return NULL;
 }
 
 static int btfs_getattr(const char *path, struct stat *stbuf) {
@@ -106,8 +119,7 @@ void initLog() {
     defaultConf.setToDefault();
     defaultConf.setGlobally(el::ConfigurationType::Format, "%datetime %level %msg");
     defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
-    defaultConf.set(el::Level::Debug, el::ConfigurationType::Format, "%datetime %fbase:%line %level %msg");
-    defaultConf.set(el::Level::Verbose, el::ConfigurationType::Format, "%datetime [%func] %fbase:%line %level %msg");
+    defaultConf.set(el::Level::Verbose, el::ConfigurationType::Format, "%datetime %fbase:%line %level %msg");
     el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
     el::Loggers::reconfigureAllLoggers(defaultConf);
 }
@@ -117,6 +129,7 @@ int main(int argc, char *argv[]) {
     initLog();
     struct fuse_operations btfs_ops;
     memset(&btfs_ops, 0, sizeof(btfs_ops));
+    btfs_ops.init = btfs_init;
     btfs_ops.getattr = btfs_getattr;
     btfs_ops.readdir = btfs_readdir;
     btfs_ops.open = btfs_open;
@@ -129,6 +142,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (el::Loggers::verboseLevel() > 0) {
+        fuse_opt_add_arg(&args, "-f");
+    }
     if (metadatas.empty()) {
         params.help = 1;
     }
@@ -174,13 +190,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    sess.init();
-
     curl_global_init(CURL_GLOBAL_ALL);
-
-    for (auto& metadata : metadatas) {
-        sess.addTorrent(metadata);
-    }
 
     fuse_main(args.argc, args.argv, &btfs_ops, NULL);
 
