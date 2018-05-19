@@ -120,6 +120,9 @@ void initLog() {
     defaultConf.setGlobally(el::ConfigurationType::Format, "%datetime %level %msg");
     defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
     defaultConf.set(el::Level::Verbose, el::ConfigurationType::Format, "%datetime %fbase:%line %level %msg");
+    if (el::Loggers::verboseLevel() > 0) {
+        defaultConf.setGlobally(el::ConfigurationType::Filename, "btfsng.log");
+    }
     el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
     el::Loggers::reconfigureAllLoggers(defaultConf);
 }
@@ -142,9 +145,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (el::Loggers::verboseLevel() > 0) {
-        fuse_opt_add_arg(&args, "-f");
-    }
     if (metadatas.empty()) {
         params.help = 1;
     }
