@@ -1,0 +1,49 @@
+/*
+ * Session.h
+ *
+ *  Created on: 12 May 2018
+ *      Author: rkfg
+ */
+
+#ifndef SESSION_H_
+#define SESSION_H_
+
+#include <fuse.h>
+#include <mutex>
+#include <thread>
+#include <boost/unordered_map.hpp>
+#include "Torrent.h"
+#include <libtorrent/session.hpp>
+#include <libtorrent/alert_types.hpp>
+#include "main.h"
+
+class Session {
+public:
+    Session(btfs_params& params);
+    void init();
+    void stop();
+    Torrent& addTorrent(const std::string& metadata);
+    Torrent& getTorrentByPath(const char* path);
+private:
+    std::recursive_mutex m_global_mutex;
+    btfs_params& m_params;
+    std::unique_ptr<libtorrent::session> m_session;
+    std::unique_ptr<std::thread> m_alert_thread;
+    bool m_stop = false;
+#if LIBTORRENT_VERSION_NUM < 10200
+    boost::unordered_map<libtorrent::torrent_handle, std::unique_ptr<Torrent>> m_thmap;
+#else
+    std::unordered_map<libtorrent::torrent_handle, Torrent> m_thmap;
+#endif
+    void alert_queue_loop();
+    void handle_alert(libtorrent::alert *a);
+    void handle_torrent_added_alert(libtorrent::torrent_added_alert *a, Torrent& t);
+    void handle_metadata_received_alert(libtorrent::metadata_received_alert *a, Torrent& t);
+    void handle_read_piece_alert(libtorrent::read_piece_alert *a, Torrent& t);
+    void handle_piece_finished_alert(libtorrent::piece_finished_alert *a, Torrent& t);
+    libtorrent::add_torrent_params create_torrent_params(const std::string& metadata);
+    std::string populate_target();
+    void populate_metadata(const std::string& arg, libtorrent::add_torrent_params& params);
+};
+
+#endif /* SESSION_H_ */

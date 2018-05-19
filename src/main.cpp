@@ -1,0 +1,177 @@
+//============================================================================
+// Name        : btfsng.cpp
+// Author      : rkfg
+// Version     :
+// Copyright   : Your copyright notice
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+#define FUSE_USE_VERSION 26
+
+#include <memory.h>
+#include <iostream>
+#include <fstream>
+#include <mutex>
+
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <fuse.h>
+#include <curl/curl.h>
+#include <libtorrent/magnet_uri.hpp>
+#include <libtorrent/torrent_info.hpp>
+#include <libtorrent/session.hpp>
+#include "main.h"
+#include "Session.h"
+#include "Torrent.h"
+
+using namespace std;
+
+std::list<std::string> metadatas;
+
+#define RETV(s, v) { s; return v; };
+
+static struct btfs_params params;
+static Session sess(params);
+
+#define BTFS_OPT(t, p, v) { t, offsetof(struct btfs_params, p), v }
+
+static const struct fuse_opt btfs_opts[] = {
+BTFS_OPT("-v", version, 1),
+BTFS_OPT("--version", version, 1),
+BTFS_OPT( "-h", help, 1),
+BTFS_OPT("--help", help, 1),
+BTFS_OPT("--help-fuse", help_fuse, 1),
+BTFS_OPT("-b", browse_only, 1),
+BTFS_OPT("--browse-only", browse_only, 1),
+BTFS_OPT("-k", keep, 1),
+BTFS_OPT("--keep", keep, 1),
+BTFS_OPT( "--min-port=%lu", min_port, 4),
+BTFS_OPT("--max-port=%lu", max_port, 4),
+BTFS_OPT("--max-download-rate=%lu", max_download_rate, 4),
+BTFS_OPT("--max-upload-rate=%lu", max_upload_rate, 4),
+FUSE_OPT_END };
+
+static int btfs_process_arg(void *data, const char *arg, int key, struct fuse_args *outargs) {
+    // Number of NONOPT options so far
+
+    if (key == FUSE_OPT_KEY_NONOPT && metadatas.empty()) {
+        metadatas.push_back(arg);
+
+        return 0;
+    }
+
+    return 1;
+}
+
+static void print_help() {
+    printf("usage: btfsng [options] metadata mountpoint\n");
+    printf("\n");
+    printf("btfs options:\n");
+    printf("    --version -v           show version information\n");
+    printf("    --help -h              show this message\n");
+    printf("    --help-fuse            print all fuse options\n");
+    printf("    --browse-only -b       download metadata only\n");
+    printf("    --keep -k              keep files after unmount\n");
+    printf("    --min-port=N           start of listen port range\n");
+    printf("    --max-port=N           end of listen port range\n");
+    printf("    --max-download-rate=N  max download rate (in kB/s)\n");
+    printf("    --max-upload-rate=N    max upload rate (in kB/s)\n");
+}
+
+static int btfs_getattr(const char *path, struct stat *stbuf) {
+    return sess.getTorrentByPath(path).getattr(path, stbuf);
+}
+
+static int btfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+    return sess.getTorrentByPath(path).readdir(path, buf, filler, offset, fi);
+}
+
+static int btfs_open(const char *path, struct fuse_file_info *fi) {
+    return sess.getTorrentByPath(path).open(path, fi);
+}
+
+static int btfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    return sess.getTorrentByPath(path).read(path, buf, size, offset, fi);
+}
+
+static void btfs_destroy(void *user_data) {
+    sess.stop();
+}
+
+int main(int argc, char *argv[]) {
+
+    struct fuse_operations btfs_ops;
+    memset(&btfs_ops, 0, sizeof(btfs_ops));
+    btfs_ops.getattr = btfs_getattr;
+    btfs_ops.readdir = btfs_readdir;
+    btfs_ops.open = btfs_open;
+    btfs_ops.read = btfs_read;
+    /*
+     btfs_ops.statfs = btfs_statfs;
+     btfs_ops.listxattr = btfs_listxattr;
+     btfs_ops.getxattr = btfs_getxattr;
+     */
+    btfs_ops.destroy = btfs_destroy;
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+    if (fuse_opt_parse(&args, &params, btfs_opts, btfs_process_arg))
+        RETV(fprintf(stderr, "Failed to parse options\n"), -1);
+
+    if (metadatas.empty())
+        params.help = 1;
+
+    if (params.version) {
+        printf("btfsng version: 0.1\n");
+        printf("libtorrent version: " LIBTORRENT_VERSION "\n");
+
+        // Let FUSE print more versions
+        fuse_opt_add_arg(&args, "--version");
+        fuse_main(args.argc, args.argv, &btfs_ops, NULL);
+
+        return 0;
+    }
+
+    if (params.help || params.help_fuse) {
+        // Print info about btfs' command line options
+        print_help();
+
+        if (params.help_fuse) {
+            printf("\n");
+
+            // Let FUSE print more help
+            fuse_opt_add_arg(&args, "-ho");
+            fuse_main(args.argc, args.argv, &btfs_ops, NULL);
+        }
+
+        return 0;
+    }
+
+    if (params.min_port == 0 && params.max_port == 0) {
+        // Default ports are the standard Bittorrent range
+        params.min_port = 6881;
+        params.max_port = 6889;
+    } else if (params.min_port == 0) {
+        params.min_port = 1024;
+    } else if (params.max_port == 0) {
+        params.max_port = 65535;
+    }
+
+    if (params.min_port > params.max_port)
+        RETV(fprintf(stderr, "Invalid port range\n"), -1);
+
+    sess.init();
+
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    for (auto& metadata : metadatas) {
+        sess.addTorrent(metadata);
+    }
+
+    fuse_main(args.argc, args.argv, &btfs_ops, NULL);
+
+    curl_global_cleanup();
+
+    return 0;
+}
