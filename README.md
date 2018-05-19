@@ -13,6 +13,7 @@ This is a heavily refactored version of [BTFS](https://github.com/johang/btfs).
 - global variables and static functions mostly removed
 - some optimizations are made (replaced maps with unordered maps, implemented more precise pieces triggers etc.)
 - pthread function calls are replaced with C++11 synchronization primitives and threads.
+- added verbose logging via [easylogging++](https://github.com/muflihun/easyloggingpp)
 
 In future multitorrent support might be introduced.
 
@@ -39,6 +40,7 @@ To unmount and shutdown:
     $ sudo apt-get install autoconf automake libfuse-dev libtorrent-rasterbar-dev libcurl4-openssl-dev libboost-filesystem-dev g++ meson
     $ git clone https://github.com/rkfg/btfsng.git btfsng
     $ cd btfsng
+    $ git submodule update --init
     $ meson build
     $ cd build
     $ ninja
@@ -54,6 +56,7 @@ Use [`brew`](https://brew.sh) to get the dependencies.
     $ brew install Caskroom/cask/osxfuse libtorrent-rasterbar libboost-filesystem-dev autoconf automake pkg-config meson
     $ git clone https://github.com/rkfg/btfsng.git btfsng
     $ cd btfsng
+    $ git submodule update --init
     $ meson build
     $ cd build
     $ ninja
