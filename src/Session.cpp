@@ -29,15 +29,17 @@ void Session::stop() {
     if (!m_params.keep)
         flags |= libtorrent::session::delete_files;
 
-    for (auto& t : m_thmap) {
-        m_session->remove_torrent(t.second->handle(), flags);
+    if (m_session) {
+        for (auto& t : m_thmap) {
+            m_session->remove_torrent(t.second->handle(), flags);
+        }
     }
     try {
-        if (m_alert_thread->joinable()) { // race condition is possible here, will be caught
+        if (m_alert_thread && m_alert_thread->joinable()) { // race condition is possible here, will be caught
             m_alert_thread->join();
         }
     } catch (const std::exception& e) {
-        LOG(WARNING) << "Couldn't join alert thread " << e.what();
+        LOG(WARNING)<< "Couldn't join alert thread " << e.what();
     }
     if (!m_params.keep) {
         for (auto& t : m_thmap) {
