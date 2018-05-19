@@ -33,7 +33,7 @@ To unmount and shutdown:
 * fuse ("fuse" in Ubuntu 16.04)
 * libtorrent ("libtorrent-rasterbar8" in Ubuntu 16.04)
 * libcurl ("libcurl3" in Ubuntu 16.04)
-* boost-system, boost-filesystem ("libboost-filesystem" and "libboost-system-dev" in Ubuntu 16.04)
+* boost-system, boost-filesystem ("libboost-filesystem-dev" and "libboost-system-dev" in Ubuntu 16.04)
 
 ## Building from git on a recent Debian/Ubuntu
 
