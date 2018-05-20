@@ -8,8 +8,6 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
-#include <list>
-
 #define LOCK std::lock_guard<std::recursive_mutex> l(m_global_mutex)
 
 struct btfs_params {

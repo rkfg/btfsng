@@ -28,8 +28,6 @@
 #include "../easyloggingpp/src/easylogging++.h"
 INITIALIZE_EASYLOGGINGPP
 
-using namespace std;
-
 std::list<std::string> metadatas;
 
 static struct btfs_params params;

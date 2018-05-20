@@ -37,11 +37,9 @@ private:
     libtorrent::torrent_handle m_handle;
     std::unordered_map<std::string, int> m_files;
     std::unordered_map<std::string, std::unordered_set<std::string> > m_dirs;
-    std::string populate_target(char *arg);
     std::mutex m_read_mutex;
     std::condition_variable m_cv;
     std::unordered_set<std::unique_ptr<ReadTask>> m_reads;
-    void populate_metadata(const std::string& arg);
     bool is_root(const char *path);
     bool is_dir(const char *path);
     bool is_file(const char *path);
