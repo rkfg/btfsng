@@ -320,9 +320,9 @@ size_t handle_http(void *contents, size_t size, size_t nmemb, void *userp) {
     return nmemb * size;
 }
 
-void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_params& params) {
-    std::string uri(arg);
+void Session::populate_metadata(const std::string& uri, libtorrent::add_torrent_params& params) {
 
+    VLOG(1) << "Trying to populate metadata from " << uri;
     if (uri.find("http:") == 0 || uri.find("https:") == 0) {
         CURL *ch = curl_easy_init();
 
@@ -372,10 +372,11 @@ void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_
         if (ec)
             throw std::runtime_error(std::string("Parse magnet failed: " + ec.message()));
     } else {
+        VLOG(1) << "File needed, reading";
         std::unique_ptr<char> r(realpath(uri.c_str(), NULL));
 
         if (!r)
-            throw std::runtime_error("Find metadata failed");
+            throw std::runtime_error("Metadata file not found");
 
         libtorrent::error_code ec;
 

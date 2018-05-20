@@ -44,7 +44,7 @@ private:
     void handle_piece_finished_alert(libtorrent::piece_finished_alert *a, Torrent& t);
     libtorrent::add_torrent_params create_torrent_params(const std::string& metadata);
     std::string populate_target();
-    void populate_metadata(const std::string& arg, libtorrent::add_torrent_params& params);
+    void populate_metadata(const std::string& uri, libtorrent::add_torrent_params& params);
 };
 
 #endif /* SESSION_H_ */
