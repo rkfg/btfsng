@@ -22,8 +22,8 @@ public:
     Session(btfs_params& params);
     void init();
     void stop();
-    Torrent& addTorrent(const std::string& metadata);
-    Torrent& getTorrentByPath(const char* path);
+    Torrent& add_torrent(const std::string& metadata);
+    Torrent& get_torrent_by_path(const char* path);
     ~Session();
 private:
     std::recursive_mutex m_global_mutex;

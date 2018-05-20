@@ -138,10 +138,10 @@ void Session::init() {
 
 #endif
     m_alert_thread = std::make_unique<std::thread>(&Session::alert_queue_loop, this);
-
 }
 
 void Session::alert_queue_loop() {
+    VLOG(1) << "Alert thread started";
     while (!m_stop) {
         if (!m_session->wait_for_alert(libtorrent::seconds(1)))
             continue;
@@ -169,15 +169,15 @@ void Session::alert_queue_loop() {
     }
 }
 
-Torrent& Session::addTorrent(const std::string& metadata) {
+Torrent& Session::add_torrent(const std::string& metadata) {
     LOCK;
-
+    VLOG(1) << "Adding torrent from " << metadata;
     auto handle = m_session->add_torrent(create_torrent_params(metadata));
     auto res = m_thmap.emplace(handle, std::make_unique<Torrent>(m_global_mutex, m_params, handle));
     return *res.first->second;
 }
 
-Torrent& Session::getTorrentByPath(const char* path) {
+Torrent& Session::get_torrent_by_path(const char* path) {
     return *m_thmap.begin()->second;
 }
 
@@ -324,7 +324,6 @@ void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_
     std::string uri(arg);
 
     if (uri.find("http:") == 0 || uri.find("https:") == 0) {
-
         CURL *ch = curl_easy_init();
 
         std::vector<char> http_response;
@@ -334,6 +333,7 @@ void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_
         curl_easy_setopt(ch, CURLOPT_USERAGENT, "btfsng/0.1");
         curl_easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1);
 
+        VLOG(1) << "http(s) metadata needed, downloading";
         CURLcode res = curl_easy_perform(ch);
 
         if (res != CURLE_OK)
@@ -364,6 +364,7 @@ void Session::populate_metadata(const std::string& arg, libtorrent::add_torrent_
         params.flags |= libtorrent::torrent_flags::paused;
 #endif
     } else if (uri.find("magnet:") == 0) {
+        VLOG(1) << "Magnet metadata needed, requesting";
         libtorrent::error_code ec;
 
         parse_magnet_uri(uri, params, ec);

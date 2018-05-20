@@ -85,7 +85,7 @@ static void* btfs_init(struct fuse_conn_info *conn) {
     try {
         sess.init();
         for (auto& metadata : metadatas) {
-            sess.addTorrent(metadata);
+            sess.add_torrent(metadata);
         }
     } catch (const std::exception& e) {
         LOG(FATAL)<< "Error initializing session: " << e.what();
@@ -95,19 +95,19 @@ static void* btfs_init(struct fuse_conn_info *conn) {
 }
 
 static int btfs_getattr(const char *path, struct stat *stbuf) {
-    return sess.getTorrentByPath(path).getattr(path, stbuf);
+    return sess.get_torrent_by_path(path).getattr(path, stbuf);
 }
 
 static int btfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    return sess.getTorrentByPath(path).readdir(path, buf, filler, offset, fi);
+    return sess.get_torrent_by_path(path).readdir(path, buf, filler, offset, fi);
 }
 
 static int btfs_open(const char *path, struct fuse_file_info *fi) {
-    return sess.getTorrentByPath(path).open(path, fi);
+    return sess.get_torrent_by_path(path).open(path, fi);
 }
 
 static int btfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    return sess.getTorrentByPath(path).read(path, buf, size, offset, fi);
+    return sess.get_torrent_by_path(path).read(path, buf, size, offset, fi);
 }
 
 static void btfs_destroy(void *user_data) {
