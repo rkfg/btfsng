@@ -98,7 +98,7 @@ void ReadTask::copy_data(int piece_idx, char *buffer, int size) {
     VLOG(3) << "Want to copy data idx=" << piece_idx << " size=" << size;
     auto p = m_pieces.find(piece_idx);
     if (p == m_pieces.end()) {
-        VLOG(3) << "Don't have idx=" << piece_idx << " size=" << size;
+        VLOG(3) << "Don't need idx=" << piece_idx << " size=" << size;
         return;
     }
     auto& piece = p->second;
