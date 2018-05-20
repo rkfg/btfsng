@@ -177,8 +177,15 @@ Torrent& Session::add_torrent(const std::string& metadata) {
     return *res.first->second;
 }
 
-Torrent& Session::get_torrent_by_path(const char* path) {
-    return *m_thmap.begin()->second;
+std::list<std::shared_ptr<Torrent>> Session::get_torrents_by_path(const char* path) {
+    std::list<std::shared_ptr<Torrent>> result;
+    bool all = !strcmp(path, "/");
+    for (auto& t : m_thmap) {
+        if (all || t.second->has_path(path)) {
+            result.emplace_back(t.second);
+        }
+    }
+    return result;
 }
 
 void Session::handle_torrent_added_alert(libtorrent::torrent_added_alert *a, Torrent& t) {

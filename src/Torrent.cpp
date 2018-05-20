@@ -28,6 +28,10 @@ bool Torrent::is_dir(const char *path) {
     return m_dirs.find(path) != m_dirs.end();
 }
 
+bool Torrent::has_path(const char* path) {
+    return is_dir(path) || is_file(path);
+}
+
 bool Torrent::is_file(const char *path) {
     return m_files.find(path) != m_files.end();
 }

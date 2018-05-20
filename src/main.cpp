@@ -55,11 +55,8 @@ FUSE_OPT_END };
 std::unique_ptr<char> cwd(getcwd(NULL, 0));
 
 static int btfs_process_arg(void *data, const char *arg, int key, struct fuse_args *outargs) {
-    // Number of NONOPT options so far
-
-    if (key == FUSE_OPT_KEY_NONOPT && metadatas.empty()) {
+    if (key == FUSE_OPT_KEY_NONOPT && strcmp(arg, static_cast<btfs_params*>(data)->mountpoint)) {
         metadatas.push_back(arg);
-
         return 0;
     }
 
@@ -95,20 +92,39 @@ static void* btfs_init(struct fuse_conn_info *conn) {
     return NULL;
 }
 
+static int do_for_torrents(const char *path, std::function<int(const std::shared_ptr<Torrent>&)> f) {
+    auto ts = sess.get_torrents_by_path(path);
+    int r = 0;
+    for (auto& t : ts) {
+        if ((r = f(t)) < 0) {
+            break;
+        }
+    }
+    return r;
+}
+
 static int btfs_getattr(const char *path, struct stat *stbuf) {
-    return sess.get_torrent_by_path(path).getattr(path, stbuf);
+    return do_for_torrents(path, [=](auto& t) {
+        return t->getattr(path, stbuf);
+    });
 }
 
 static int btfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    return sess.get_torrent_by_path(path).readdir(path, buf, filler, offset, fi);
+    return do_for_torrents(path, [=](auto& t) {
+        return t->readdir(path, buf, filler, offset, fi);
+    });
 }
 
 static int btfs_open(const char *path, struct fuse_file_info *fi) {
-    return sess.get_torrent_by_path(path).open(path, fi);
+    return do_for_torrents(path, [=](auto& t) {
+        return t->open(path, fi);
+    });
 }
 
 static int btfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    return sess.get_torrent_by_path(path).read(path, buf, size, offset, fi);
+    return do_for_torrents(path, [=](auto& t) {
+       return t->read(path, buf, size, offset, fi);
+    });
 }
 
 static void btfs_destroy(void *user_data) {
@@ -140,7 +156,7 @@ int main(int argc, char *argv[]) {
     btfs_ops.read = btfs_read;
     btfs_ops.destroy = btfs_destroy;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-
+    params.mountpoint = argv[argc - 1];
     if (fuse_opt_parse(&args, &params, btfs_opts, btfs_process_arg)) {
         LOG(FATAL)<< "Failed to parse options";
         return 1;

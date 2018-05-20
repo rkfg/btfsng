@@ -23,7 +23,7 @@ public:
     void init();
     void stop();
     Torrent& add_torrent(const std::string& metadata);
-    Torrent& get_torrent_by_path(const char* path);
+    std::list<std::shared_ptr<Torrent>> get_torrents_by_path(const char* path);
     ~Session();
 private:
     std::recursive_mutex m_global_mutex;
@@ -32,7 +32,7 @@ private:
     std::unique_ptr<std::thread> m_alert_thread;
     bool m_stop = false;
 #if LIBTORRENT_VERSION_NUM < 10200
-    boost::unordered_map<libtorrent::torrent_handle, std::unique_ptr<Torrent>> m_thmap;
+    boost::unordered_map<libtorrent::torrent_handle, std::shared_ptr<Torrent>> m_thmap;
 #else
     std::unordered_map<libtorrent::torrent_handle, Torrent> m_thmap;
 #endif

@@ -14,13 +14,12 @@ This is a heavily refactored version of [BTFS](https://github.com/johang/btfs).
 - some optimizations are made (replaced maps with unordered maps, implemented more precise pieces triggers etc.)
 - pthread function calls are replaced with C++11 synchronization primitives and threads.
 - added verbose logging via [easylogging++](https://github.com/muflihun/easyloggingpp)
-
-In future multitorrent support might be introduced.
+- multitorrent support (initial implementation)
 
 ## Example usage
 
     $ mkdir mnt
-    $ btfsng video.torrent mnt
+    $ btfsng video.torrent http://torrent.site/dl/another.torrent onemore.torrent mnt
     $ cd mnt
     $ vlc video.mp4
 
