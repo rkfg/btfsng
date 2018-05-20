@@ -54,6 +54,8 @@ BTFS_OPT("--max-download-rate=%lu", max_download_rate, 4),
 BTFS_OPT("--max-upload-rate=%lu", max_upload_rate, 4),
 FUSE_OPT_END };
 
+std::unique_ptr<char> cwd(getcwd(NULL, 0));
+
 static int btfs_process_arg(void *data, const char *arg, int key, struct fuse_args *outargs) {
     // Number of NONOPT options so far
 
@@ -83,6 +85,7 @@ static void print_help() {
 }
 static void* btfs_init(struct fuse_conn_info *conn) {
     try {
+        chdir(cwd.get());
         sess.init();
         for (auto& metadata : metadatas) {
             sess.add_torrent(metadata);
