@@ -118,9 +118,6 @@ int Torrent::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t 
     if (is_file(path))
         return -ENOTDIR;
 
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
-
     for (auto& d : m_dirs[path]) {
         filler(buf, d.c_str(), NULL, 0);
     }

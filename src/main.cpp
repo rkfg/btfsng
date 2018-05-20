@@ -110,6 +110,8 @@ static int btfs_getattr(const char *path, struct stat *stbuf) {
 }
 
 static int btfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+    filler(buf, ".", NULL, 0);
+    filler(buf, "..", NULL, 0);
     return do_for_torrents(path, [=](auto& t) {
         return t->readdir(path, buf, filler, offset, fi);
     });
