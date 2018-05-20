@@ -26,7 +26,7 @@ public:
     std::list<std::shared_ptr<Torrent>> get_torrents_by_path(const char* path);
     ~Session();
 private:
-    std::recursive_mutex m_global_mutex;
+    std::mutex m_mutex;
     btfs_params& m_params;
     std::unique_ptr<libtorrent::session> m_session;
     std::unique_ptr<std::thread> m_alert_thread;

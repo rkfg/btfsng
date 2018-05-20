@@ -9,16 +9,15 @@
 #include <libtorrent/torrent_info.hpp>
 #include "../easyloggingpp/src/easylogging++.h"
 
-void ReadTask::prioritize(int piece, int priority) {
-    if (!m_handle.have_piece(piece)) {
-        VLOG(3) << "Prioritizing piece " << piece << " to " << priority;
-        m_handle.piece_priority(piece, priority);
+void ReadTask::prioritize(int piece_idx, int priority) {
+    if (!m_handle.have_piece(piece_idx)) {
+        VLOG(3) << "Prioritizing piece " << piece_idx << " to " << priority;
+        m_handle.piece_priority(piece_idx, priority);
     }
 }
 
-ReadTask::ReadTask(const libtorrent::torrent_handle& handle, std::mutex& read_mutex, std::condition_variable& cv,
-        char *buf, int index, off_t offset, size_t size) :
-        m_handle(handle), m_mutex(read_mutex), m_cv(cv) {
+ReadTask::ReadTask(const libtorrent::torrent_handle& handle, char *buf, int index, off_t offset, size_t size) :
+        m_handle(handle) {
     VLOG(2) << "New read index=" << index << " offset=" << offset << " size=" << size;
     auto ti = m_handle.torrent_file();
 
@@ -56,8 +55,8 @@ int ReadTask::read() {
 
     try_read_all();
 
-    std::unique_lock<std::mutex> lock(m_mutex);
-    m_cv.wait(lock, [this] {
+    std::unique_lock<std::mutex> lock(m_read_mutex);
+    m_cv.wait(lock, [this] { // wait for all pieces to download or fail, cv will be notified from the alert thread
         return !m_piece_count || m_failed;
     });
 
@@ -74,40 +73,48 @@ void ReadTask::try_read_all() {
     }
 }
 
-void ReadTask::fail(int piece_num) {
-    LOG(WARNING) << "Piece " << piece_num << " failed to download";
-    auto p = m_pieces.find(piece_num);
-    if (p == m_pieces.end() || p->second.ready) {
+void ReadTask::fail(int piece_idx) {
+    LOG(WARNING)<< "Piece " << piece_idx << " failed to download";
+    auto piece = get_piece(piece_idx);
+    if (!piece || piece->ready) {
         return;
     }
     m_failed = true;
 }
 
-void ReadTask::try_read(int piece) {
-    VLOG(3) << "Try read " << piece;
-    auto p = m_pieces.find(piece);
-    if (p == m_pieces.end()) {
-        VLOG(3) << "Not interested in " << piece;
+void ReadTask::try_read(int piece_idx) {
+    VLOG(3) << "Try read " << piece_idx;
+    auto piece = get_piece(piece_idx);
+    if (!piece) {
         return;
     }
-    VLOG(3) << "Sent read request for piece " << piece;
-    m_handle.read_piece(piece);
+    m_handle.read_piece(piece_idx);
+    VLOG(3) << "Sent read request for piece " << piece_idx;
 }
 
 void ReadTask::copy_data(int piece_idx, char *buffer, int size) {
-    VLOG(3) << "Want to copy data idx=" << piece_idx << " size=" << size;
-    auto p = m_pieces.find(piece_idx);
-    if (p == m_pieces.end()) {
-        VLOG(3) << "Don't need idx=" << piece_idx << " size=" << size;
+    std::lock_guard<std::mutex> l(m_read_mutex);
+    VLOG(3) << "Want to copy data for idx=" << piece_idx << " size=" << size;
+    auto piece = get_piece(piece_idx);
+    if (!piece) {
         return;
     }
-    auto& piece = p->second;
-    if (!piece.ready) {
-        VLOG(3) << "Data ready, copying idx=" << piece_idx << " offset=" << piece.m_req.start << " size="
-                << piece.m_req.length;
-        piece.ready = (memcpy(piece.m_buf, buffer + piece.m_req.start, (size_t) piece.m_req.length)) != NULL;
+    if (!piece->ready) {
+        VLOG(3) << "Data ready, copying idx=" << piece_idx << " offset=" << piece->m_req.start << " size="
+                << piece->m_req.length;
+        piece->ready = (memcpy(piece->m_buf, buffer + piece->m_req.start, (size_t) piece->m_req.length)) != NULL;
         --m_piece_count;
     } else {
-        VLOG(3) << "Data already copied idx=" << piece_idx << " size=" << piece.m_req.length;
+        VLOG(3) << "Data already copied idx=" << piece_idx << " size=" << piece->m_req.length;
     }
+    m_cv.notify_one();
+}
+
+Piece* ReadTask::get_piece(int piece_idx) {
+    auto p = m_pieces.find(piece_idx);
+    if (p == m_pieces.end()) {
+        VLOG(3) << "Don't need idx=" << piece_idx;
+        return nullptr;
+    }
+    return &p->second;
 }

@@ -21,12 +21,13 @@ struct Piece {
 
 class ReadTask {
 public:
-    ReadTask(const libtorrent::torrent_handle& handle, std::mutex& read_mutex, std::condition_variable& cv, char *buf,
-            int index, off_t offset, size_t size);
+    ReadTask(const libtorrent::torrent_handle& handle, char *buf, int index, off_t offset,
+            size_t size);
+    std::mutex m_read_mutex;
     int read();
     void try_read_all();
-    void try_read(int piece);
-    void fail(int piece_num);
+    void try_read(int piece_idx);
+    void fail(int piece_idx);
     void copy_data(int piece_idx, char *buffer, int size);
 private:
     const libtorrent::torrent_handle& m_handle;
@@ -34,10 +35,10 @@ private:
     int m_piece_count = 0;
     size_t m_effective_size;
     bool m_failed = false;
-    std::mutex& m_mutex;
-    std::condition_variable& m_cv;
+    std::condition_variable m_cv;
 
-    void prioritize(int piece, int priority);
+    void prioritize(int piece_idx, int priority);
+    Piece* get_piece(int piece_idx);
 };
 
 #endif /* READTASK_H_ */

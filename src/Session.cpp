@@ -14,6 +14,8 @@
 #include "../easyloggingpp/src/easylogging++.h"
 #define STRINGIFY(s) #s
 
+#define LOCK_SESSION std::lock_guard<std::mutex> l(m_mutex)
+
 Session::Session(btfs_params& params) :
         m_params(params) {
 }
@@ -25,13 +27,15 @@ void Session::stop() {
 #else
     libtorrent::remove_flags_t flags = {};
 #endif
-
-    if (!m_params.keep)
+    {
+        LOCK_SESSION;
+        if (!m_params.keep)
         flags |= libtorrent::session::delete_files;
 
-    if (m_session) {
-        for (auto& t : m_thmap) {
-            m_session->remove_torrent(t.second->handle(), flags);
+        if (m_session) {
+            for (auto& t : m_thmap) {
+                m_session->remove_torrent(t.second->handle(), flags);
+            }
         }
     }
     try {
@@ -39,7 +43,7 @@ void Session::stop() {
             m_alert_thread->join();
         }
     } catch (const std::exception& e) {
-        LOG(WARNING)<< "Couldn't join alert thread " << e.what();
+        LOG(WARNING)<< "Couldn't join alert thread: " << e.what();
     }
     if (!m_params.keep) {
         for (auto& t : m_thmap) {
@@ -51,24 +55,23 @@ void Session::stop() {
 }
 
 void Session::init() {
-    LOCK;
 
 #if LIBTORRENT_VERSION_NUM < 10200
     int flags =
 #else
-    libtorrent::session_flags_t flags =
+            libtorrent::session_flags_t flags =
 #endif
-    libtorrent::session::add_default_plugins | libtorrent::session::start_default_features;
+            libtorrent::session::add_default_plugins | libtorrent::session::start_default_features;
 
 #if LIBTORRENT_VERSION_NUM < 10200
     int alerts =
 #else
-    libtorrent::alert_category_t alerts =
+            libtorrent::alert_category_t alerts =
 #endif
-    libtorrent::alert::tracker_notification | libtorrent::alert::stats_notification
-    | libtorrent::alert::storage_notification | libtorrent::alert::progress_notification
-    | libtorrent::alert::status_notification | libtorrent::alert::error_notification
-    | libtorrent::alert::dht_notification | libtorrent::alert::peer_notification;
+            libtorrent::alert::tracker_notification | libtorrent::alert::stats_notification
+                    | libtorrent::alert::storage_notification | libtorrent::alert::progress_notification
+                    | libtorrent::alert::status_notification | libtorrent::alert::error_notification
+                    | libtorrent::alert::dht_notification | libtorrent::alert::peer_notification;
 
 #if LIBTORRENT_VERSION_NUM < 10100
     session = new libtorrent::session(
@@ -106,7 +109,7 @@ void Session::init() {
 
 // Possibly more ports, but at most 5
     for (int i = m_params.min_port + 1; i <= m_params.max_port && i < m_params.min_port + 5; i++)
-    interfaces << ",0.0.0.0:" << i;
+        interfaces << ",0.0.0.0:" << i;
 
     std::string fingerprint = "LT"
     STRINGIFY(LIBTORRENT_VERSION_MAJOR)
@@ -158,7 +161,7 @@ void Session::alert_queue_loop() {
         std::vector<libtorrent::alert*> alerts;
 
         {
-            LOCK;
+            LOCK_SESSION;
             m_session->pop_alerts(&alerts);
 
             for (auto& alert : alerts) {
@@ -170,10 +173,10 @@ void Session::alert_queue_loop() {
 }
 
 Torrent& Session::add_torrent(const std::string& metadata) {
-    LOCK;
+    LOCK_SESSION;
     VLOG(1) << "Adding torrent from " << metadata;
     auto handle = m_session->add_torrent(create_torrent_params(metadata));
-    auto res = m_thmap.emplace(handle, std::make_unique<Torrent>(m_global_mutex, m_params, handle));
+    auto res = m_thmap.emplace(handle, std::make_unique<Torrent>(m_params, handle));
     return *res.first->second;
 }
 
@@ -189,26 +192,23 @@ std::list<std::shared_ptr<Torrent>> Session::get_torrents_by_path(const char* pa
 }
 
 void Session::handle_torrent_added_alert(libtorrent::torrent_added_alert *a, Torrent& t) {
-    LOCK;
     VLOG(1) << "Torrent '" << a->handle.status().name << "' added";
-    if (a->handle.status().has_metadata)
-    t.setup();
+    if (a->handle.status().has_metadata) {
+        t.setup();
+    }
 }
 
 void Session::handle_metadata_received_alert(libtorrent::metadata_received_alert *a, Torrent& t) {
-    LOCK;
     VLOG(1) << "Metadata for '" << a->handle.status().name << "' received";
     t.setup();
 }
 
 void Session::handle_read_piece_alert(libtorrent::read_piece_alert *a, Torrent& t) {
-    LOCK;
     VLOG(2) << "Piece " << a->piece <<" read";
     t.read_piece(*a);
 }
 
 void Session::handle_piece_finished_alert(libtorrent::piece_finished_alert *a, Torrent& t) {
-    LOCK;
     VLOG(2) << "Piece " << a->piece_index << " finished downloading";
     t.try_read_all(a->piece_index);
 }
@@ -279,6 +279,7 @@ libtorrent::add_torrent_params Session::create_torrent_params(const std::string&
     populate_metadata(metadata, add_params);
     return add_params;
 }
+
 std::string Session::populate_target() {
     std::string templ, target;
 

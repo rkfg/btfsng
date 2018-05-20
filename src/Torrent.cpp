@@ -11,8 +11,10 @@
 #include <libtorrent/magnet_uri.hpp>
 #include "../easyloggingpp/src/easylogging++.h"
 
-Torrent::Torrent(std::recursive_mutex& global_mutex, btfs_params& params, libtorrent::torrent_handle& handle) :
-        m_global_mutex(global_mutex), m_params(params), m_handle(handle) {
+#define LOCK_TORRENT std::lock_guard<std::mutex> l(m_mutex)
+
+Torrent::Torrent(btfs_params& params, libtorrent::torrent_handle& handle) :
+        m_params(params), m_handle(handle) {
     m_time_of_mount = time(NULL);
 }
 
@@ -47,7 +49,7 @@ int Torrent::getattr(const char *path, struct stat *stbuf) {
     stbuf->st_mtime = m_time_of_mount;
 
     if (is_root(path) || is_dir(path)) {
-        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_mode = S_IFDIR | 0555;
     } else {
         auto ti = m_handle.torrent_file();
 
@@ -75,39 +77,44 @@ int Torrent::getattr(const char *path, struct stat *stbuf) {
 }
 
 int Torrent::open(const char* path, struct fuse_file_info* fi) {
-    if (!is_dir(path) && !is_file(path))
+    if (!is_dir(path) && !is_file(path)) {
         return -ENOENT;
+    }
 
-    if (is_dir(path))
+    if (is_dir(path)) {
         return -EISDIR;
+    }
 
-    if ((fi->flags & 3) != O_RDONLY)
+    if ((fi->flags & 3) != O_RDONLY) {
         return -EACCES;
+    }
 
     return 0;
 }
 
 int Torrent::read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    if (!is_dir(path) && !is_file(path))
+    if (!is_dir(path) && !is_file(path)) {
         return -ENOENT;
+    }
 
-    if (is_dir(path))
+    if (is_dir(path)) {
         return -EISDIR;
+    }
 
-    if (m_params.browse_only)
+    if (m_params.browse_only) {
         return -EACCES;
+    }
 
-    m_read_mutex.lock();
-    auto& r = *m_reads.emplace(
-            std::make_unique<ReadTask>(m_handle, m_read_mutex, m_cv, buf, m_files[path], offset, size)).first;
-    m_read_mutex.unlock();
+    m_mutex.lock(); // only lock torrent's mutex to add and remove pending reads to avoid races
+    auto& r = *m_reads.emplace(std::make_unique<ReadTask>(m_handle, buf, m_files[path], offset, size)).first;
+    m_mutex.unlock();
+
     // Wait for read to finish
     int s = r->read();
 
-    m_read_mutex.lock();
+    m_mutex.lock();
     m_reads.erase(r);
-    m_read_mutex.unlock();
-
+    m_mutex.unlock();
     return s;
 }
 
@@ -171,11 +178,10 @@ void Torrent::setup() {
 }
 
 void Torrent::read_piece(const libtorrent::read_piece_alert& a) {
-    std::lock_guard<std::mutex> l(m_read_mutex);
+    LOCK_TORRENT;
     VLOG(3) << "Read piece " << a.piece;
     if (a.ec) {
-        LOG(WARNING) << a.message();
-
+        LOG(WARNING)<< a.message();
         for (auto& r : m_reads) {
             r->fail(a.piece);
         }
@@ -184,11 +190,10 @@ void Torrent::read_piece(const libtorrent::read_piece_alert& a) {
             r->copy_data(a.piece, a.buffer.get(), a.size);
         }
     }
-    m_cv.notify_all();
 }
 
 void Torrent::try_read_all(int piece) {
-    std::lock_guard<std::mutex> l(m_read_mutex);
+    LOCK_TORRENT;
     for (auto& r : m_reads) {
         r->try_read(piece);
     }

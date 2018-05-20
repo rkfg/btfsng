@@ -20,8 +20,8 @@
 
 class Torrent {
 public:
-    Torrent(std::recursive_mutex& global_mutex, btfs_params& params, libtorrent::torrent_handle& handle);
-    Torrent(const Torrent& o) = delete;
+    Torrent(btfs_params& params, libtorrent::torrent_handle& handle);
+    Torrent(const Torrent& o) = delete; // not copyable anyway due to mutex usage but it's better to state that explicitly
     const libtorrent::torrent_handle& handle();
     void setup();
     int getattr(const char *path, struct stat *stbuf);
@@ -33,13 +33,11 @@ public:
     bool has_path(const char *path);
 private:
     time_t m_time_of_mount;
-    std::recursive_mutex& m_global_mutex;
+    std::mutex m_mutex;
     btfs_params& m_params;
     libtorrent::torrent_handle m_handle;
     std::unordered_map<std::string, int> m_files;
     std::unordered_map<std::string, std::unordered_set<std::string> > m_dirs;
-    std::mutex m_read_mutex;
-    std::condition_variable m_cv;
     std::unordered_set<std::unique_ptr<ReadTask>> m_reads;
     bool is_root(const char *path);
     bool is_dir(const char *path);
