@@ -1,4 +1,4 @@
-project('BTFS new generation', 'cpp')
+project('BTFS new generation', 'cpp', default_options : ['cpp_std=c++14'])
 c = meson.get_compiler('cpp')
 libtorrent = dependency('libtorrent-rasterbar')
 fuse = dependency('fuse')

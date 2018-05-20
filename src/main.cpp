@@ -92,7 +92,7 @@ static void* btfs_init(struct fuse_conn_info *conn) {
     return NULL;
 }
 
-static int do_for_torrents(const char *path, std::function<int(const std::shared_ptr<Torrent>&)> f) {
+inline static int do_for_torrents(const char *path, std::function<int(const std::shared_ptr<Torrent>&)> f) {
     auto ts = sess.get_torrents_by_path(path);
     int r = 0;
     for (auto& t : ts) {
