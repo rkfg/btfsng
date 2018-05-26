@@ -290,10 +290,10 @@ std::string Session::populate_target() {
         templ += "/tmp/btfsng";
     }
 
-    if (mkdir(templ.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) < 0) {
-        if (errno != EEXIST) {
-            throw std::runtime_error("Failed to create target");
-        }
+    try {
+        boost::filesystem::create_directories(templ);
+    } catch (const boost::filesystem::filesystem_error& e) {
+        throw std::runtime_error(std::string("Failed to create target: ") + e.what());
     }
 
     templ += "/btfsng-XXXXXX";
