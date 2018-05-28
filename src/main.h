@@ -20,6 +20,7 @@ struct btfs_params {
     int max_download_rate;
     int max_upload_rate;
     char* mountpoint;
+    char* files_path;
 };
 
 #endif /* MAIN_H_ */

@@ -49,7 +49,7 @@ void Session::stop() {
         for (auto& t : m_thmap) {
             namespace fs = boost::filesystem;
             fs::path save_path(t.first.status().save_path);
-            fs::remove_all(save_path.parent_path());
+            fs::remove_all(save_path);
         }
     }
 }
@@ -204,7 +204,7 @@ void Session::handle_metadata_received_alert(libtorrent::metadata_received_alert
 }
 
 void Session::handle_read_piece_alert(libtorrent::read_piece_alert *a, Torrent& t) {
-    VLOG(2) << "Piece " << a->piece <<" read";
+    VLOG(2) << "Piece " << a->piece << " read";
     t.read_piece(*a);
 }
 
@@ -271,48 +271,54 @@ libtorrent::add_torrent_params Session::create_torrent_params(const std::string&
     add_params.flags &= ~libtorrent::torrent_flags::auto_managed;
     add_params.flags &= ~libtorrent::torrent_flags::paused;
 #endif
-    add_params.save_path = target + "/files";
-
-    if (mkdir(add_params.save_path.c_str(), 0777) < 0)
-        throw std::runtime_error("Failed to create files directory");
+    add_params.save_path = target;
 
     populate_metadata(metadata, add_params);
     return add_params;
 }
 
+inline void create_directory(const std::string& dir) {
+    try {
+        boost::filesystem::create_directories(dir);
+    } catch (const boost::filesystem::filesystem_error& e) {
+        throw std::runtime_error(std::string("Failed to create target: ") + e.what());
+    }
+}
+
+inline std::string expand(const char* dir) {
+    std::unique_ptr<char> x(realpath(dir, NULL));
+
+    if (x)
+        return x.get();
+    else
+        throw std::runtime_error("Failed to expand target");
+}
+
 std::string Session::populate_target() {
     std::string templ, target;
 
-    if (getenv("HOME")) {
+    if (m_params.files_path != NULL) {
+        templ = m_params.files_path;
+        create_directory(templ);
+        return expand(templ.c_str());
+    } else if (getenv("HOME")) {
         templ += getenv("HOME");
         templ += "/.local/share/btfsng";
     } else {
         templ += "/tmp/btfsng";
     }
 
-    try {
-        boost::filesystem::create_directories(templ);
-    } catch (const boost::filesystem::filesystem_error& e) {
-        throw std::runtime_error(std::string("Failed to create target: ") + e.what());
-    }
+    create_directory(templ);
 
     templ += "/btfsng-XXXXXX";
 
     std::unique_ptr<char> s(strdup(templ.c_str()));
 
     if (s != NULL && mkdtemp(s.get()) != NULL) {
-        std::unique_ptr<char> x(realpath(s.get(), NULL));
-
-        if (x)
-            target = x.get();
-        else
-            throw std::runtime_error("Failed to expand target");
-
+        return expand(s.get());
     } else {
         throw std::runtime_error("Failed to generate target");
     }
-
-    return target;
 }
 
 size_t handle_http(void *contents, size_t size, size_t nmemb, void *userp) {

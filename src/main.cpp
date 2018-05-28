@@ -50,6 +50,8 @@ BTFS_OPT( "--min-port=%lu", min_port, 4),
 BTFS_OPT("--max-port=%lu", max_port, 4),
 BTFS_OPT("--max-download-rate=%lu", max_download_rate, 4),
 BTFS_OPT("--max-upload-rate=%lu", max_upload_rate, 4),
+BTFS_OPT("-p %s", files_path, 1),
+BTFS_OPT("--path=%s", files_path, 1),
 FUSE_OPT_END };
 
 std::unique_ptr<char> cwd(getcwd(NULL, 0));
