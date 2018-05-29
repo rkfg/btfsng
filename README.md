@@ -11,10 +11,15 @@ This is a heavily refactored version of [BTFS](https://github.com/johang/btfs).
 - the build system is replaced with [Meson](https://mesonbuild.com/)
 - most of the code is moved into classes
 - global variables and static functions mostly removed
-- some optimizations are made (replaced maps with unordered maps, implemented more precise pieces triggers etc.)
+- optimizations made:
+    - replaced maps with unordered maps
+    - implemented more precise pieces triggers
+    - the requested piece gets max priority, up to 15 pieces after it get slightly less priority
+    - more precise locks (per torrent and per read request) to allow for better parallelism (might be too optimistic and cause race conditions instead so need testing)
 - pthread function calls are replaced with C++11 synchronization primitives and threads.
 - added verbose logging via [easylogging++](https://github.com/muflihun/easyloggingpp)
-- multitorrent support (initial implementation)
+- multitorrent support (no name collision resolving)
+- option to set the downloaded files path to resume downloading/seeding later. Original BTFS creates temporary directories with random names so seeding is impossible after unmount even with -k (keep)
 
 ## Example usage
 
