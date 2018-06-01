@@ -298,7 +298,7 @@ std::string Session::populate_target() {
     std::string templ, target;
 
     if (m_params.files_path != NULL) {
-        templ = m_params.files_path;
+        templ = m_params.files_path + std::string("/files");
         create_directory(templ);
         return expand(templ.c_str());
     } else if (getenv("HOME")) {
