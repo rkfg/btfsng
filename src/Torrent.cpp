@@ -10,6 +10,7 @@
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include "../easyloggingpp/src/easylogging++.h"
+#include "compat.h"
 
 #define LOCK_TORRENT std::lock_guard<std::mutex> l(m_mutex)
 
@@ -51,7 +52,7 @@ int Torrent::getattr(const char *path, struct stat *stbuf) {
     if (is_root(path) || is_dir(path)) {
         stbuf->st_mode = S_IFDIR | 0555;
     } else {
-        auto ti = m_handle.torrent_file();
+    auto ti = torrentInfo(m_handle);
 
 #if LIBTORRENT_VERSION_NUM < 10100
         int64_t file_size = ti->file_at(m_files[path]).size;
@@ -135,7 +136,7 @@ int Torrent::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 void Torrent::setup() {
     VLOG(1) << "Got metadata. Now ready to start downloading.";
 
-    auto ti = m_handle.torrent_file();
+    auto ti = torrentInfo(m_handle);
 
     if (m_params.browse_only)
         m_handle.pause();

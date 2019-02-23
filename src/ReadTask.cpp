@@ -8,6 +8,7 @@
 #include "ReadTask.h"
 #include <libtorrent/torrent_info.hpp>
 #include "../easyloggingpp/src/easylogging++.h"
+#include "compat.h"
 
 void ReadTask::prioritize(int piece_idx, int priority) {
     if (!m_handle.have_piece(piece_idx)) {
@@ -19,8 +20,7 @@ void ReadTask::prioritize(int piece_idx, int priority) {
 ReadTask::ReadTask(const libtorrent::torrent_handle& handle, char *buf, int index, off_t offset, size_t size) :
         m_handle(handle) {
     VLOG(2) << "New read index=" << index << " offset=" << offset << " size=" << size;
-    auto ti = m_handle.torrent_file();
-
+    auto ti = torrentInfo(m_handle);
     int64_t file_size = ti->files().file_size(index);
 
     m_effective_size = 0;
