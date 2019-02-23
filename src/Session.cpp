@@ -11,10 +11,10 @@
 #include <libtorrent/torrent_info.hpp>
 #include <boost/filesystem.hpp>
 #include <curl/curl.h>
-#include "../easyloggingpp/src/easylogging++.h"
+#include "easylogging++.h"
 #define STRINGIFY(s) #s
 
-#define LOCK_SESSION std::lock_guard<std::mutex> l(m_mutex)
+#define LOCK_SESSION std::lock_guard<std::recursive_mutex> l(m_mutex)
 
 Session::Session(btfs_params& params) :
         m_params(params) {
@@ -74,7 +74,7 @@ void Session::init() {
                     | libtorrent::alert::dht_notification | libtorrent::alert::peer_notification;
 
 #if LIBTORRENT_VERSION_NUM < 10100
-    session = new libtorrent::session(
+    m_session = new libtorrent::session(
             libtorrent::fingerprint(
                     "LT",
                     LIBTORRENT_VERSION_MAJOR,
@@ -95,10 +95,10 @@ void Session::init() {
     se.download_rate_limit = m_params.max_download_rate * 1024;
     se.upload_rate_limit = m_params.max_upload_rate * 1024;
 
-    session->set_settings(se);
-    session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
-    session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
-    session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
+    m_session->set_settings(se);
+    m_session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
+    m_session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
+    m_session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
 #else
     libtorrent::settings_pack pack;
 
@@ -134,9 +134,9 @@ void Session::init() {
     m_session = std::make_unique<libtorrent::session>(pack, flags);
 
 #if LIBTORRENT_VERSION_NUM < 10101
-    session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
-    session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
-    session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
+    m_session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
+    m_session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
+    m_session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
 #endif
 
 #endif
@@ -152,7 +152,7 @@ void Session::alert_queue_loop() {
 #if LIBTORRENT_VERSION_NUM < 10100
         std::deque<libtorrent::alert*> alerts;
 
-        session->pop_alerts(&alerts);
+        m_session->pop_alerts(&alerts);
 
         for (std::deque<libtorrent::alert*>::iterator i = alerts.begin(); i != alerts.end(); ++i) {
             handle_alert(*i, (Log *) data);

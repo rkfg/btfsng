@@ -9,9 +9,9 @@
 #include <curl/curl.h>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/magnet_uri.hpp>
-#include "../easyloggingpp/src/easylogging++.h"
+#include "easylogging++.h"
 
-#define LOCK_TORRENT std::lock_guard<std::mutex> l(m_mutex)
+#define LOCK_TORRENT std::lock_guard<std::recursive_mutex> l(m_mutex)
 
 Torrent::Torrent(btfs_params& params, libtorrent::torrent_handle& handle) :
         m_params(params), m_handle(handle) {

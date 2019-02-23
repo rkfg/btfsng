@@ -1,0 +1,4 @@
+[wrap-git]
+directory = easyloggingpp_v9.96.5
+url = https://github.com/rkfg/easyloggingpp.git
+revision = 8a55f7296a4793ea633de9dd8d247d637fb0897a

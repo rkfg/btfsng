@@ -7,7 +7,7 @@
 
 #include "ReadTask.h"
 #include <libtorrent/torrent_info.hpp>
-#include "../easyloggingpp/src/easylogging++.h"
+#include "easylogging++.h"
 
 void ReadTask::prioritize(int piece_idx, int priority) {
     if (!m_handle.have_piece(piece_idx)) {

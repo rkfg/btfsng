@@ -25,7 +25,7 @@
 #include "main.h"
 #include "Session.h"
 #include "Torrent.h"
-#include "../easyloggingpp/src/easylogging++.h"
+#include "easylogging++.h"
 INITIALIZE_EASYLOGGINGPP
 
 std::list<std::string> metadatas;

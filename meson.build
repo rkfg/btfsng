@@ -5,13 +5,12 @@ fuse = dependency('fuse')
 curl = dependency('libcurl')
 thread_dep = dependency('threads')
 boost = dependency('boost', modules : ['filesystem'])
-deps = [libtorrent, fuse, curl, boost, thread_dep]
+deps = [libtorrent, fuse, curl, boost, thread_dep, subproject('elpp').get_variable('elpp_dep')]
 src = [
   'src/main.cpp',
   'src/ReadTask.cpp',
   'src/Session.cpp',
   'src/Torrent.cpp',
-  'easyloggingpp/src/easylogging++.cc',
 ]
 
 executable('btfsng', src, 

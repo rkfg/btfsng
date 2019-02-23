@@ -33,7 +33,7 @@ public:
     bool has_path(const char *path);
 private:
     time_t m_time_of_mount;
-    std::mutex m_mutex;
+    std::recursive_mutex m_mutex;
     btfs_params& m_params;
     libtorrent::torrent_handle m_handle;
     std::unordered_map<std::string, int> m_files;
