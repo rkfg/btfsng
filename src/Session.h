@@ -31,11 +31,7 @@ private:
     std::unique_ptr<libtorrent::session> m_session;
     std::unique_ptr<std::thread> m_alert_thread;
     bool m_stop = false;
-#if LIBTORRENT_VERSION_NUM < 10200
     boost::unordered_map<libtorrent::torrent_handle, std::shared_ptr<Torrent>> m_thmap;
-#else
-    std::unordered_map<libtorrent::torrent_handle, Torrent> m_thmap;
-#endif
     void alert_queue_loop();
     void handle_alert(libtorrent::alert *a);
     void handle_torrent_added_alert(libtorrent::torrent_added_alert *a, Torrent& t);

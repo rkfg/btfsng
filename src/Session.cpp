@@ -22,11 +22,7 @@ Session::Session(btfs_params& params) :
 
 void Session::stop() {
     m_stop = true;
-#if LIBTORRENT_VERSION_NUM < 10200
     int flags = 0;
-#else
-    libtorrent::remove_flags_t flags = {};
-#endif
     {
         LOCK_SESSION;
         if (!m_params.keep)
@@ -56,50 +52,12 @@ void Session::stop() {
 
 void Session::init() {
 
-#if LIBTORRENT_VERSION_NUM < 10200
-    int flags =
-#else
-            libtorrent::session_flags_t flags =
-#endif
-            libtorrent::session::add_default_plugins | libtorrent::session::start_default_features;
+    int flags = libtorrent::session::add_default_plugins | libtorrent::session::start_default_features;
+    int alerts = libtorrent::alert::tracker_notification | libtorrent::alert::stats_notification
+            | libtorrent::alert::storage_notification | libtorrent::alert::progress_notification
+            | libtorrent::alert::status_notification | libtorrent::alert::error_notification
+            | libtorrent::alert::dht_notification | libtorrent::alert::peer_notification;
 
-#if LIBTORRENT_VERSION_NUM < 10200
-    int alerts =
-#else
-            libtorrent::alert_category_t alerts =
-#endif
-            libtorrent::alert::tracker_notification | libtorrent::alert::stats_notification
-                    | libtorrent::alert::storage_notification | libtorrent::alert::progress_notification
-                    | libtorrent::alert::status_notification | libtorrent::alert::error_notification
-                    | libtorrent::alert::dht_notification | libtorrent::alert::peer_notification;
-
-#if LIBTORRENT_VERSION_NUM < 10100
-    m_session = new libtorrent::session(
-            libtorrent::fingerprint(
-                    "LT",
-                    LIBTORRENT_VERSION_MAJOR,
-                    LIBTORRENT_VERSION_MINOR,
-                    0,
-                    0),
-            std::make_pair(m_params.min_port, m_params.max_port),
-            "0.0.0.0",
-            flags,
-            alerts);
-
-    libtorrent::session_settings se = m_session->settings();
-
-    se.request_timeout = 10;
-    se.strict_end_game_mode = false;
-    se.announce_to_all_trackers = true;
-    se.announce_to_all_tiers = true;
-    se.download_rate_limit = m_params.max_download_rate * 1024;
-    se.upload_rate_limit = m_params.max_upload_rate * 1024;
-
-    m_session->set_settings(se);
-    m_session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
-    m_session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
-    m_session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
-#else
     libtorrent::settings_pack pack;
 
     std::ostringstream interfaces;
@@ -116,11 +74,9 @@ void Session::init() {
     STRINGIFY(LIBTORRENT_VERSION_MINOR)
     "00";
 
-#if LIBTORRENT_VERSION_NUM >= 10101
     pack.set_str(pack.dht_bootstrap_nodes, "router.bittorrent.com:6881,"
             "router.utorrent.com:6881,"
             "dht.transmissionbt.com:6881");
-#endif
 
     pack.set_int(pack.request_timeout, 10);
     pack.set_str(pack.listen_interfaces, interfaces.str());
@@ -132,14 +88,6 @@ void Session::init() {
     pack.set_int(pack.alert_mask, alerts);
 
     m_session = std::make_unique<libtorrent::session>(pack, flags);
-
-#if LIBTORRENT_VERSION_NUM < 10101
-    m_session->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
-    m_session->add_dht_router(std::make_pair("router.utorrent.com", 6881));
-    m_session->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
-#endif
-
-#endif
     m_alert_thread = std::make_unique<std::thread>(&Session::alert_queue_loop, this);
 }
 
@@ -149,15 +97,6 @@ void Session::alert_queue_loop() {
         if (!m_session->wait_for_alert(libtorrent::seconds(1)))
             continue;
 
-#if LIBTORRENT_VERSION_NUM < 10100
-        std::deque<libtorrent::alert*> alerts;
-
-        m_session->pop_alerts(&alerts);
-
-        for (std::deque<libtorrent::alert*>::iterator i = alerts.begin(); i != alerts.end(); ++i) {
-            handle_alert(*i, (Log *) data);
-        }
-#else
         std::vector<libtorrent::alert*> alerts;
 
         {
@@ -168,7 +107,6 @@ void Session::alert_queue_loop() {
                 handle_alert(alert);
             }
         }
-#endif
     }
 }
 
@@ -254,9 +192,6 @@ void Session::handle_alert(libtorrent::alert *a) {
         break;
     }
 
-#if LIBTORRENT_VERSION_NUM < 10100
-    delete a;
-#endif
 }
 
 libtorrent::add_torrent_params Session::create_torrent_params(const std::string& metadata) {
@@ -264,13 +199,8 @@ libtorrent::add_torrent_params Session::create_torrent_params(const std::string&
     std::string target = populate_target();
     VLOG(1) << "Files path: " << target;
 
-#if LIBTORRENT_VERSION_NUM < 10200
     add_params.flags &= ~libtorrent::add_torrent_params::flag_auto_managed;
     add_params.flags &= ~libtorrent::add_torrent_params::flag_paused;
-#else
-    add_params.flags &= ~libtorrent::torrent_flags::auto_managed;
-    add_params.flags &= ~libtorrent::torrent_flags::paused;
-#endif
     add_params.save_path = target;
 
     populate_metadata(metadata, add_params);
@@ -357,26 +287,14 @@ void Session::populate_metadata(const std::string& uri, libtorrent::add_torrent_
 
         libtorrent::error_code ec;
 
-#if LIBTORRENT_VERSION_NUM < 10100
-        params.ti = new libtorrent::torrent_info((const char *) http_response.buf, (int) http_response.size, ec);
-#elif LIBTORRENT_VERSION_NUM < 10200
         params.ti = boost::make_shared<libtorrent::torrent_info>((const char *) http_response.data(),
                 (int) http_response.size(), boost::ref(ec));
-#else
-        params.ti = std::make_shared<libtorrent::torrent_info>(
-                (const char *) m_http_response.buf, (int) m_http_response.size,
-                std::ref(ec));
-#endif
 
         if (ec)
             throw std::runtime_error(std::string("Parse metadata failed: ") + ec.message());
 
         if (m_params.browse_only)
-#if LIBTORRENT_VERSION_NUM < 10200
             params.flags |= libtorrent::add_torrent_params::flag_paused;
-#else
-        params.flags |= libtorrent::torrent_flags::paused;
-#endif
     } else if (uri.find("magnet:") == 0) {
         VLOG(1) << "Magnet metadata needed, requesting";
         libtorrent::error_code ec;
@@ -394,24 +312,13 @@ void Session::populate_metadata(const std::string& uri, libtorrent::add_torrent_
 
         libtorrent::error_code ec;
 
-#if LIBTORRENT_VERSION_NUM < 10100
-        params.ti = new libtorrent::torrent_info(r.get(), ec);
-#elif LIBTORRENT_VERSION_NUM < 10200
         params.ti = boost::make_shared<libtorrent::torrent_info>(r.get(), boost::ref(ec));
-#else
-        params.ti = std::make_shared<libtorrent::torrent_info>(r.get(),
-                std::ref(ec));
-#endif
 
         if (ec)
             throw std::runtime_error(std::string("Parse metadata failed: " + ec.message()));
 
         if (m_params.browse_only)
-#if LIBTORRENT_VERSION_NUM < 10200
             params.flags |= libtorrent::add_torrent_params::flag_paused;
-#else
-        params.flags |= libtorrent::torrent_flags::paused;
-#endif
     }
 
 }

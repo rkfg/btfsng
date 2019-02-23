@@ -53,17 +53,9 @@ int Torrent::getattr(const char *path, struct stat *stbuf) {
     } else {
         auto ti = m_handle.torrent_file();
 
-#if LIBTORRENT_VERSION_NUM < 10100
-        int64_t file_size = ti->file_at(m_files[path]).size;
-#else
         int64_t file_size = ti->files().file_size(m_files[path]);
-#endif
 
-#if LIBTORRENT_VERSION_NUM < 10200
         std::vector<boost::int64_t> progress;
-#else
-        std::vector<std::int64_t> progress;
-#endif
 
         // Get number of bytes downloaded of each file
         m_handle.file_progress(progress, libtorrent::torrent_handle::piece_granularity);
@@ -143,11 +135,7 @@ void Torrent::setup() {
     for (int i = 0; i < ti->num_files(); ++i) {
         std::string parent("");
 
-#if LIBTORRENT_VERSION_NUM < 10100
-        std::unique_ptr<char> p(strdup(ti->file_at(i).path.c_str()));
-#else
         std::unique_ptr<char> p(strdup(ti->files().file_path(i).c_str()));
-#endif
 
         if (!p)
             continue;
@@ -169,11 +157,7 @@ void Torrent::setup() {
         }
 
         // Path <-> file index mapping
-#if LIBTORRENT_VERSION_NUM < 10100
-        m_files["/" + ti->file_at(i).path] = i;
-#else
         m_files["/" + ti->files().file_path(i)] = i;
-#endif
     }
 }
 
