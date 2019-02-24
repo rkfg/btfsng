@@ -3,9 +3,9 @@
 MNT=
 if [ -n "$2" ]
 then
-  MNT="$1"
+  MNT="$(readlink -f "$1")"
   shift
-  docker run --rm -it --device /dev/fuse --privileged --mount type=bind,source="$MNT",destination=/mnt,bind-propagation=shared btfsng sh -c "useradd -m -d /home/user -u `id -u` `id -nu` && sudo -u \#`id -u` env HOME=/home/user gdb --args /btfsng/build/btfsng -f -v -o allow_other "$@" /mnt"
+  docker run --rm -it --device /dev/fuse --privileged --mount type=bind,source="$MNT",destination=/mnt,bind-propagation=shared btfsng sh -c "useradd -m -d /home/user -u `id -u` `id -nu` && sudo -u \#`id -u` env HOME=/home/user /btfsng/build/btfsng -f -v -o allow_other "$@" /mnt"
 else
   docker run --rm -it --device /dev/fuse --privileged btfsng /btfsng/build/btfsng -f -v -o allow_other "$@"
 fi
